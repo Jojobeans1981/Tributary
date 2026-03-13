@@ -1,13 +1,16 @@
 """
 Production settings for TRIBUTARY API.
 """
+import os
+
 import dj_database_url
 
 from .base import *  # noqa: F401, F403
 
 DEBUG = False
 
-ALLOWED_HOSTS = config("ALLOWED_HOSTS", cast=Csv())  # noqa: F405
+# Use os.environ directly — python-decouple may not see Render env vars
+ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "").split(",")  # noqa: F405
 
 # Database from Render environment
 DATABASES["default"] = dj_database_url.config(  # noqa: F405
