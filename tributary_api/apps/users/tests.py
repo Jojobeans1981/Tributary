@@ -81,7 +81,7 @@ class TestRegister:
         assert data["success"] is True
         assert User.objects.filter(email=user_data["email"]).exists()
         user = User.objects.get(email=user_data["email"])
-        assert user.is_active is False
+        assert user.is_active is True
         # Email should be in allauth records
         assert EmailAddress.objects.filter(email=user_data["email"]).exists()
 

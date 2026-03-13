@@ -39,19 +39,18 @@ class RegisterView(APIView):
             password=data["password"],
             first_name=data["first_name"],
             last_name=data["last_name"],
-            is_active=False,
+            is_active=True,
         )
 
-        # Create allauth EmailAddress record and send verification
-        email_address = EmailAddress.objects.create(
+        # Auto-verify email — skip SendGrid email verification for now
+        EmailAddress.objects.create(
             user=user,
             email=user.email,
             primary=True,
-            verified=False,
+            verified=True,
         )
-        email_address.send_confirmation(request, signup=True)
 
-        return ok({"message": "Check your email to verify your account."})
+        return ok({"message": "Account created. You can now log in."})
 
 
 class VerifyEmailView(APIView):
