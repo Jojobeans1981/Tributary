@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     # Local apps
     "apps.users",
     "apps.districts",
+    "apps.matching",
 ]
 
 MIDDLEWARE = [

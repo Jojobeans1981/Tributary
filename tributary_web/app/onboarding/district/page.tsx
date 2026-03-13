@@ -74,7 +74,7 @@ export default function DistrictSelectPage() {
       return;
     }
 
-    router.push("/dashboard");
+    router.push("/onboarding/problems");
   };
 
   return (

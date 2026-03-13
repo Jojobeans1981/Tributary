@@ -21,7 +21,7 @@ export default function LoginPage() {
     const res = await apiFetch<{
       access: string;
       refresh: string;
-      user: { has_ferpa_consent: boolean; has_district: boolean };
+      user: { has_ferpa_consent: boolean; has_district: boolean; has_problem_selections: boolean };
     }>("/api/auth/login/", {
       method: "POST",
       body: JSON.stringify({ email, password }),
@@ -44,6 +44,8 @@ export default function LoginPage() {
       router.push("/onboarding/consent");
     } else if (!res.data!.user.has_district) {
       router.push("/onboarding/district");
+    } else if (!res.data!.user.has_problem_selections) {
+      router.push("/onboarding/problems");
     } else {
       router.push("/dashboard");
     }

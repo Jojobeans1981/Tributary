@@ -131,6 +131,19 @@ export default function DashboardPage() {
             </Link>
           </div>
         )}
+
+        {/* Match feed link */}
+        <div className="mt-6">
+          <Link
+            href="/matches"
+            className="block bg-current text-white rounded-card shadow-card p-4 text-center hover:bg-deep transition-colors"
+          >
+            <span className="font-display text-lg font-bold">Find Matches</span>
+            <p className="text-foam text-sm mt-1">
+              Connect with literacy professionals facing similar challenges
+            </p>
+          </Link>
+        </div>
       </main>
     </div>
   );

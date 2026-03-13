@@ -91,6 +91,7 @@ class UserUpdateSerializer(serializers.Serializer):
 class LoginResponseUserSerializer(serializers.ModelSerializer):
     has_ferpa_consent = serializers.SerializerMethodField()
     has_district = serializers.SerializerMethodField()
+    has_problem_selections = serializers.SerializerMethodField()
     profile_completion_pct = serializers.SerializerMethodField()
 
     class Meta:
@@ -101,6 +102,7 @@ class LoginResponseUserSerializer(serializers.ModelSerializer):
             "role",
             "has_ferpa_consent",
             "has_district",
+            "has_problem_selections",
             "profile_completion_pct",
         ]
 
@@ -109,6 +111,9 @@ class LoginResponseUserSerializer(serializers.ModelSerializer):
 
     def get_has_district(self, obj):
         return obj.district_id is not None
+
+    def get_has_problem_selections(self, obj):
+        return obj.problem_selections.exists()
 
     def get_profile_completion_pct(self, obj):
         return 40 if obj.bio else 0

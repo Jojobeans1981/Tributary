@@ -45,6 +45,9 @@ export default function NavHeader({ user }: { user: User | null }) {
 
       {/* Desktop nav */}
       <div className="hidden md:flex items-center gap-4">
+        <Link href="/matches" className="text-foam text-sm hover:text-white transition-colors">
+          Matches
+        </Link>
         <div className="relative">
           <button
             onClick={() => setMenuOpen(!menuOpen)}
@@ -119,6 +122,13 @@ export default function NavHeader({ user }: { user: User | null }) {
               </svg>
             </button>
             <nav className="flex flex-col gap-4">
+              <Link
+                href="/matches"
+                className="text-foam text-lg"
+                onClick={() => setMobileOpen(false)}
+              >
+                Matches
+              </Link>
               <Link
                 href={`/profile/${user.id}`}
                 className="text-foam text-lg"
