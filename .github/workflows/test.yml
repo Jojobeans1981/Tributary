@@ -1,0 +1,35 @@
+on: [pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: tributary_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+        ports:
+          - 5432:5432
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/tributary_test
+      REDIS_URL: redis://localhost:6379
+      DJANGO_SECRET_KEY: ci-not-a-real-secret
+      DJANGO_SETTINGS_MODULE: tributary_api.settings.dev
+    defaults:
+      run:
+        working-directory: tributary_api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements/dev.txt
+      - run: pytest --cov=. --cov-report=term-missing --cov-fail-under=80
+      - run: flake8 . --max-line-length=120 --exclude=migrations,venv

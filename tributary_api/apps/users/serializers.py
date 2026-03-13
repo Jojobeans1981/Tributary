@@ -1,0 +1,114 @@
+from rest_framework import serializers
+
+from apps.districts.serializers import DistrictSerializer
+from apps.users.models import FerpaConsent, User
+
+
+class RegisterSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True, min_length=8)
+    first_name = serializers.CharField(max_length=100)
+    last_name = serializers.CharField(max_length=100)
+
+    def validate_email(self, value):
+        if User.objects.filter(email__iexact=value).exists():
+            raise serializers.ValidationError("A user with this email already exists.")
+        return value.lower()
+
+
+class LoginSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True)
+
+
+class ConsentSerializer(serializers.Serializer):
+    consent_text_version = serializers.CharField(max_length=10, default="1.0")
+
+
+class PasswordResetSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    uid = serializers.CharField()
+    token = serializers.CharField()
+    new_password = serializers.CharField(write_only=True, min_length=8)
+
+
+class UserSerializer(serializers.ModelSerializer):
+    has_ferpa_consent = serializers.SerializerMethodField()
+    has_district = serializers.SerializerMethodField()
+    profile_completion_pct = serializers.SerializerMethodField()
+    district = DistrictSerializer(read_only=True)
+
+    class Meta:
+        model = User
+        fields = [
+            "id",
+            "email",
+            "first_name",
+            "last_name",
+            "role",
+            "bio",
+            "district",
+            "profile_completion_pct",
+            "has_ferpa_consent",
+            "has_district",
+            "email_preference",
+        ]
+        read_only_fields = ["id", "email", "role"]
+
+    def get_has_ferpa_consent(self, obj):
+        return hasattr(obj, "ferpa_consent")
+
+    def get_has_district(self, obj):
+        return obj.district_id is not None
+
+    def get_profile_completion_pct(self, obj):
+        return 40 if obj.bio else 0
+
+
+class PublicUserSerializer(serializers.ModelSerializer):
+    district = DistrictSerializer(read_only=True)
+
+    class Meta:
+        model = User
+        fields = ["id", "first_name", "last_name", "role", "bio", "district"]
+
+
+class UserUpdateSerializer(serializers.Serializer):
+    first_name = serializers.CharField(max_length=100, required=False)
+    last_name = serializers.CharField(max_length=100, required=False)
+    bio = serializers.CharField(max_length=500, required=False, allow_blank=True)
+    district = serializers.CharField(max_length=7, required=False, allow_null=True)
+
+    def validate_bio(self, value):
+        if len(value) > 500:
+            raise serializers.ValidationError("Bio must be 500 characters or fewer.")
+        return value
+
+
+class LoginResponseUserSerializer(serializers.ModelSerializer):
+    has_ferpa_consent = serializers.SerializerMethodField()
+    has_district = serializers.SerializerMethodField()
+    profile_completion_pct = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = [
+            "id",
+            "email",
+            "role",
+            "has_ferpa_consent",
+            "has_district",
+            "profile_completion_pct",
+        ]
+
+    def get_has_ferpa_consent(self, obj):
+        return hasattr(obj, "ferpa_consent")
+
+    def get_has_district(self, obj):
+        return obj.district_id is not None
+
+    def get_profile_completion_pct(self, obj):
+        return 40 if obj.bio else 0

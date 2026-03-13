@@ -1,0 +1,3 @@
+web: daphne -b 0.0.0.0 -p $PORT tributary_api.asgi:application
+worker: celery -A tributary_api worker --loglevel=info
+beat: celery -A tributary_api beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler

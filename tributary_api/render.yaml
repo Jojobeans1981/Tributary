@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: tributary-api
+    env: python
+    buildCommand: pip install -r requirements/base.txt && python manage.py migrate --no-input && python manage.py collectstatic --no-input
+    startCommand: daphne -b 0.0.0.0 -p $PORT tributary_api.asgi:application
+  - type: worker
+    name: tributary-worker
+    env: python
+    buildCommand: pip install -r requirements/base.txt
+    startCommand: celery -A tributary_api worker --loglevel=info
+databases:
+  - name: tributary-db
+    plan: free
