@@ -1,14 +1,17 @@
 """
 Seed test users with realistic data for manual QA and demos.
+Uses bulk_create for fast batch inserts instead of one-at-a-time.
 
 Usage:
     python manage.py seed_users --count 20
-    python manage.py seed_users --count 50 --domain testschool.org --password DemoPass123
-    python manage.py seed_users --count 10 --connections --messages
+    python manage.py seed_users --count 500 --domain testschool.org --password DemoPass123
+    python manage.py seed_users --count 100 --connections --messages
 """
 import random
+import uuid
 from datetime import timedelta
 
+from django.contrib.auth.hashers import make_password
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
@@ -84,14 +87,6 @@ BIOS = [
     "Parent liaison developing family reading nights and literacy workshops.",
 ]
 
-STATES = [
-    "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
-    "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
-    "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",
-    "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC",
-    "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY",
-]
-
 INTRO_MESSAGES = [
     "I'd love to connect and share strategies!",
     "We seem to be tackling similar challenges. Let's chat!",
@@ -120,9 +115,11 @@ MESSAGE_BODIES = [
     "I really appreciate the collaboration. This platform is exactly what I needed.",
 ]
 
+BATCH_SIZE = 500
+
 
 class Command(BaseCommand):
-    help = "Seed test users with districts, selections, connections, and messages."
+    help = "Seed test users with districts, selections, connections, and messages (bulk insert)."
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -166,7 +163,6 @@ class Command(BaseCommand):
             deleted, _ = User.objects.filter(email__endswith=f"@{domain}").delete()
             self.stdout.write(self.style.WARNING(f"Cleared {deleted} objects from @{domain}"))
 
-        # Gather available districts and problems
         districts = list(District.objects.all())
         problems = list(ProblemStatement.objects.filter(is_active=True))
 
@@ -181,21 +177,23 @@ class Command(BaseCommand):
             return
 
         self.stdout.write(f"Seeding {count} users with @{domain} ...")
-        self.stdout.write(f"Password: {password}")
-        self.stdout.write(f"Districts available: {len(districts)}")
-        self.stdout.write(f"Problem statements: {len(problems)}")
 
-        created_users = []
+        # Hash password once — all users share it
+        hashed_password = make_password(password)
+        now = timezone.now()
+
+        # Build unique emails
         used_emails = set(
             User.objects.filter(email__endswith=f"@{domain}")
             .values_list("email", flat=True)
         )
 
-        for i in range(count):
+        # ---------- 1. Build User objects in memory ----------
+        self.stdout.write("  Building user objects...")
+        user_objects = []
+        for _ in range(count):
             first = random.choice(FIRST_NAMES)
             last = random.choice(LAST_NAMES)
-
-            # Generate unique email
             base = f"{first.lower()}.{last.lower()}"
             email = f"{base}@{domain}"
             suffix = 1
@@ -204,56 +202,62 @@ class Command(BaseCommand):
                 suffix += 1
             used_emails.add(email)
 
-            district = random.choice(districts)
-
-            user = User.objects.create_user(
+            user_objects.append(User(
+                id=uuid.uuid4(),
                 email=email,
-                password=password,
+                password=hashed_password,
                 first_name=first,
                 last_name=last,
                 role="MEMBER",
                 is_active=True,
                 bio=random.choice(BIOS),
-                district=district,
-            )
+                district=random.choice(districts),
+                date_joined=now - timedelta(days=random.randint(1, 90)),
+            ))
 
-            # Backdate join date randomly (1-90 days ago)
-            days_ago = random.randint(1, 90)
-            User.objects.filter(id=user.id).update(
-                date_joined=timezone.now() - timedelta(days=days_ago)
-            )
+        # ---------- 2. Bulk insert users ----------
+        self.stdout.write(f"  Inserting {count} users...")
+        User.objects.bulk_create(user_objects, batch_size=BATCH_SIZE)
+        self.stdout.write(self.style.SUCCESS(f"  {count} users inserted."))
 
-            # Email verification (allauth)
-            EmailAddress.objects.create(
-                user=user, email=email, primary=True, verified=True,
-            )
+        # ---------- 3. Bulk insert email verifications ----------
+        self.stdout.write("  Creating email verifications...")
+        email_objects = [
+            EmailAddress(user=u, email=u.email, primary=True, verified=True)
+            for u in user_objects
+        ]
+        EmailAddress.objects.bulk_create(email_objects, batch_size=BATCH_SIZE)
 
-            # FERPA consent
-            FerpaConsent.objects.create(
-                user=user, ip_address="127.0.0.1", consent_text_version="1.0",
-            )
+        # ---------- 4. Bulk insert FERPA consents ----------
+        self.stdout.write("  Creating FERPA consents...")
+        consent_objects = [
+            FerpaConsent(user=u, ip_address="127.0.0.1", consent_text_version="1.0")
+            for u in user_objects
+        ]
+        FerpaConsent.objects.bulk_create(consent_objects, batch_size=BATCH_SIZE)
 
-            # Select 1-3 random problem statements
+        # ---------- 5. Bulk insert problem selections ----------
+        self.stdout.write("  Creating problem selections...")
+        selection_objects = []
+        for u in user_objects:
             num_selections = random.choice([1, 2, 2, 3, 3])
             selected = random.sample(problems, min(num_selections, len(problems)))
             for ps in selected:
-                UserProblemSelection.objects.create(
-                    user=user, problem_statement=ps,
+                selection_objects.append(
+                    UserProblemSelection(user=u, problem_statement=ps)
                 )
+        UserProblemSelection.objects.bulk_create(selection_objects, batch_size=BATCH_SIZE)
+        self.stdout.write(self.style.SUCCESS(f"  {len(selection_objects)} problem selections inserted."))
 
-            created_users.append(user)
-            self.stdout.write(f"  [{i+1}/{count}] {email} — {district.name}, {district.state}")
-
-        self.stdout.write(self.style.SUCCESS(f"\nCreated {len(created_users)} users."))
-
-        # Connections
-        if create_connections and len(created_users) >= 2:
-            num_connections = min(len(created_users) * 2, len(created_users) * (len(created_users) - 1) // 2)
+        # ---------- 6. Connections ----------
+        if create_connections and len(user_objects) >= 2:
+            self.stdout.write("  Creating connections...")
+            num_connections = min(len(user_objects) * 2, len(user_objects) * (len(user_objects) - 1) // 2)
             pairs_created = set()
-            conns_created = 0
+            conn_objects = []
 
             for _ in range(num_connections):
-                a, b = random.sample(created_users, 2)
+                a, b = random.sample(user_objects, 2)
                 pair = tuple(sorted([str(a.id), str(b.id)]))
                 if pair in pairs_created:
                     continue
@@ -263,65 +267,65 @@ class Command(BaseCommand):
                     Connection.ACCEPTED, Connection.ACCEPTED, Connection.ACCEPTED,
                     Connection.PENDING,
                 ])
-                Connection.objects.create(
+                conn_objects.append(Connection(
                     requester=a, recipient=b, status=status,
                     intro_message=random.choice(INTRO_MESSAGES) if random.random() > 0.3 else "",
-                )
-                conns_created += 1
+                ))
 
-            self.stdout.write(self.style.SUCCESS(f"Created {conns_created} connections."))
+            Connection.objects.bulk_create(conn_objects, batch_size=BATCH_SIZE)
+            self.stdout.write(self.style.SUCCESS(f"  {len(conn_objects)} connections inserted."))
 
-        # Messages
-        if create_messages:
-            accepted_conns = Connection.objects.filter(
-                requester__in=created_users,
-                recipient__in=created_users,
-                status=Connection.ACCEPTED,
-            ).select_related("requester", "recipient")
+            # ---------- 7. Messages ----------
+            if create_messages:
+                self.stdout.write("  Creating conversations and messages...")
+                accepted = [c for c in conn_objects if c.status == Connection.ACCEPTED]
+                convos_created = 0
+                msg_objects = []
+                participant_objects = []
 
-            convos_created = 0
-            msgs_created = 0
+                for conn in accepted:
+                    if random.random() > 0.6:
+                        continue
 
-            for conn in accepted_conns:
-                if random.random() > 0.6:
-                    continue  # not all connections have conversations
-
-                convo = Conversation.objects.create()
-                ConversationParticipant.objects.create(conversation=convo, user=conn.requester)
-                ConversationParticipant.objects.create(conversation=convo, user=conn.recipient)
-                convos_created += 1
-
-                num_msgs = random.randint(2, 8)
-                for j in range(num_msgs):
-                    sender = conn.requester if j % 2 == 0 else conn.recipient
-                    msg_time = timezone.now() - timedelta(
-                        days=random.randint(0, 14),
-                        hours=random.randint(0, 23),
-                        minutes=random.randint(0, 59),
+                    convo = Conversation(id=uuid.uuid4())
+                    participant_objects.append(
+                        ConversationParticipant(conversation=convo, user=conn.requester)
                     )
-                    Message.objects.create(
-                        conversation=convo,
-                        sender=sender,
-                        body=random.choice(MESSAGE_BODIES),
+                    participant_objects.append(
+                        ConversationParticipant(conversation=convo, user=conn.recipient)
                     )
-                    msgs_created += 1
+                    convos_created += 1
 
-            self.stdout.write(self.style.SUCCESS(
-                f"Created {convos_created} conversations with {msgs_created} messages."
-            ))
+                    num_msgs = random.randint(2, 8)
+                    for j in range(num_msgs):
+                        sender = conn.requester if j % 2 == 0 else conn.recipient
+                        msg_objects.append(Message(
+                            conversation=convo,
+                            sender=sender,
+                            body=random.choice(MESSAGE_BODIES),
+                        ))
 
-        # Compute match scores
+                # Bulk insert conversations first (need PKs for participants/messages)
+                convo_objects = list({p.conversation for p in participant_objects})
+                Conversation.objects.bulk_create(convo_objects, batch_size=BATCH_SIZE)
+                ConversationParticipant.objects.bulk_create(participant_objects, batch_size=BATCH_SIZE)
+                Message.objects.bulk_create(msg_objects, batch_size=BATCH_SIZE)
+                self.stdout.write(self.style.SUCCESS(
+                    f"  {convos_created} conversations with {len(msg_objects)} messages inserted."
+                ))
+
+        # ---------- 8. Match scores ----------
         if compute_scores:
             self.stdout.write("Computing match scores (this may take a moment)...")
             from apps.matching.tasks import compute_all_match_scores
             compute_all_match_scores()
             self.stdout.write(self.style.SUCCESS("Match scores computed."))
 
-        # Summary
+        # ---------- Summary ----------
         self.stdout.write("\n" + "=" * 50)
         self.stdout.write(self.style.SUCCESS("SEED COMPLETE"))
         self.stdout.write(f"  Domain:   @{domain}")
         self.stdout.write(f"  Password: {password}")
-        self.stdout.write(f"  Users:    {len(created_users)}")
+        self.stdout.write(f"  Users:    {count}")
         self.stdout.write(f"  Login as any user at /login")
         self.stdout.write("=" * 50)
