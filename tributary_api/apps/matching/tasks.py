@@ -120,18 +120,34 @@ def compute_all_match_scores():
             )
         )
 
+    batch = []
+    BATCH_SIZE = 5000
     for i in range(len(profiles)):
         for j in range(i + 1, len(profiles)):
             r = compute_match_score(profiles[i], profiles[j])
-            MatchScore.objects.update_or_create(
+            batch.append(MatchScore(
                 user_a_id=r.user_a_id,
                 user_b_id=r.user_b_id,
-                defaults={
-                    "demographic_score": r.demographic_score,
-                    "problem_score": r.problem_score,
-                    "total_score": r.total_score,
-                },
-            )
+                demographic_score=r.demographic_score,
+                problem_score=r.problem_score,
+                total_score=r.total_score,
+            ))
+            if len(batch) >= BATCH_SIZE:
+                MatchScore.objects.bulk_create(
+                    batch,
+                    update_conflicts=True,
+                    unique_fields=["user_a", "user_b"],
+                    update_fields=["demographic_score", "problem_score", "total_score"],
+                )
+                batch.clear()
+
+    if batch:
+        MatchScore.objects.bulk_create(
+            batch,
+            update_conflicts=True,
+            unique_fields=["user_a", "user_b"],
+            update_fields=["demographic_score", "problem_score", "total_score"],
+        )
 
 
 @shared_task(name="matching.compute_user_match_scores")
