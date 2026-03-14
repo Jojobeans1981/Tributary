@@ -12,6 +12,11 @@ DEBUG = False
 # Use os.environ directly — python-decouple may not see Render env vars
 ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "").split(",")  # noqa: F405
 
+# Override CORS from os.environ (python-decouple may miss Render env vars)
+_cors = os.environ.get("CORS_ALLOWED_ORIGINS", "")
+if _cors:
+    CORS_ALLOWED_ORIGINS = [o.strip() for o in _cors.split(",") if o.strip()]  # noqa: F405
+
 # Database from Render environment
 DATABASES["default"] = dj_database_url.config(  # noqa: F405
     default=config("DATABASE_URL"),  # noqa: F405
