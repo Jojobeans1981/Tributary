@@ -22,7 +22,7 @@ class Command(BaseCommand):
         parser.add_argument(
             "--vintage",
             type=str,
-            default="2022-23",
+            default="2024-25",
             help="Data vintage string, e.g. '2022-23'.",
         )
 
