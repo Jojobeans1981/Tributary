@@ -22,14 +22,24 @@ interface UserData {
     enrollment: number;
   } | null;
   profile_completion_pct: number;
+  problem_selection_count: number;
   has_ferpa_consent: boolean;
   email_preference: string;
+}
+
+interface ConnectionItem {
+  id: string;
+  requester: string;
+  requester_name: string;
+  intro_message: string;
+  created_at: string;
 }
 
 export default function DashboardPage() {
   const router = useRouter();
   const [user, setUser] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [pendingConnections, setPendingConnections] = useState<ConnectionItem[]>([]);
 
   useEffect(() => {
     const token = localStorage.getItem("access_token");
@@ -49,8 +59,44 @@ export default function DashboardPage() {
         return;
       }
       setUser(res.data!);
+
+      // Fetch pending incoming connections
+      apiFetch<ConnectionItem[]>("/api/connections/?status=PENDING").then(
+        (connRes) => {
+          if (connRes.success && connRes.data) {
+            const incoming = connRes.data.filter(
+              (c) => c.requester !== res.data!.id
+            );
+            setPendingConnections(incoming);
+          }
+        }
+      );
     });
   }, [router]);
+
+  const handleAccept = async (connectionId: string) => {
+    const res = await apiFetch(`/api/connections/${connectionId}/`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: "ACCEPTED" }),
+    });
+    if (res.success) {
+      setPendingConnections((prev) =>
+        prev.filter((c) => c.id !== connectionId)
+      );
+    }
+  };
+
+  const handleDecline = async (connectionId: string) => {
+    const res = await apiFetch(`/api/connections/${connectionId}/`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: "DECLINED" }),
+    });
+    if (res.success) {
+      setPendingConnections((prev) =>
+        prev.filter((c) => c.id !== connectionId)
+      );
+    }
+  };
 
   if (loading || !user) {
     return (
@@ -68,13 +114,66 @@ export default function DashboardPage() {
   return (
     <div className="bg-mist min-h-screen">
       <NavHeader user={user} />
-      <main className="max-w-4xl mx-auto p-6">
+      <main id="main-content" className="max-w-4xl mx-auto p-6">
         <h1 className="font-display text-abyss text-3xl font-bold mb-6">
           Welcome, {user.first_name}
         </h1>
 
+        {/* Pending connection requests */}
+        {pendingConnections.length > 0 && (
+          <div
+            className="bg-chalk rounded-card shadow-card p-4 border border-amber mb-6"
+            role="region"
+            aria-label="Pending connection requests"
+          >
+            <h2 className="font-display text-abyss font-bold mb-3">
+              Connection Requests ({pendingConnections.length})
+            </h2>
+            <div className="space-y-3">
+              {pendingConnections.map((conn) => (
+                <div
+                  key={conn.id}
+                  className="flex items-center justify-between gap-3 bg-mist rounded-input p-3"
+                >
+                  <div className="min-w-0">
+                    <Link
+                      href={`/profile/${conn.requester}`}
+                      className="font-display text-abyss font-bold text-sm hover:underline"
+                    >
+                      {conn.requester_name}
+                    </Link>
+                    {conn.intro_message && (
+                      <p className="text-stone text-xs mt-0.5 truncate">
+                        &ldquo;{conn.intro_message}&rdquo;
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <button
+                      onClick={() => handleAccept(conn.id)}
+                      className="bg-go text-white text-xs font-bold px-3 py-1.5 rounded-input hover:opacity-90 transition-colors"
+                    >
+                      Accept
+                    </button>
+                    <button
+                      onClick={() => handleDecline(conn.id)}
+                      className="bg-sand text-obsidian text-xs font-bold px-3 py-1.5 rounded-input hover:bg-pebble transition-colors"
+                    >
+                      Decline
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Profile completion bar */}
-        <div className="bg-chalk rounded-card shadow-card p-4 border border-pebble mb-6">
+        <div
+          className="bg-chalk rounded-card shadow-card p-4 border border-pebble mb-6"
+          role="region"
+          aria-label="Profile completion"
+        >
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-semibold text-obsidian">
               Profile Completion
@@ -83,19 +182,46 @@ export default function DashboardPage() {
               {user.profile_completion_pct}%
             </span>
           </div>
-          <div className="w-full bg-pebble rounded-full h-2">
+          <div
+            className="w-full bg-pebble rounded-full h-2"
+            role="progressbar"
+            aria-valuenow={user.profile_completion_pct}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label={`Profile ${user.profile_completion_pct}% complete`}
+          >
             <div
               className="bg-current rounded-full h-2 transition-all duration-300"
               style={{ width: `${user.profile_completion_pct}%` }}
             />
           </div>
-          {user.profile_completion_pct < 40 && (
-            <Link
-              href={`/profile/${user.id}`}
-              className="text-current text-sm mt-2 inline-block hover:underline"
-            >
-              Complete your profile &rarr;
-            </Link>
+          {user.profile_completion_pct < 100 && (
+            <ul className="mt-3 space-y-1.5 text-sm">
+              <CompletionItem
+                done={Boolean(user.bio && user.bio.trim())}
+                label="Add a bio"
+                href={`/profile/${user.id}`}
+                points={40}
+              />
+              <CompletionItem
+                done={Boolean(user.district)}
+                label="Select your district"
+                href="/onboarding/district"
+                points={30}
+              />
+              <CompletionItem
+                done={user.problem_selection_count >= 1}
+                label="Choose a problem statement"
+                href="/onboarding/problems"
+                points={20}
+              />
+              <CompletionItem
+                done={user.problem_selection_count >= 2}
+                label="Choose a second problem statement"
+                href="/onboarding/problems"
+                points={10}
+              />
+            </ul>
           )}
         </div>
 
@@ -146,5 +272,54 @@ export default function DashboardPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+function CompletionItem({
+  done,
+  label,
+  href,
+  points,
+}: {
+  done: boolean;
+  label: string;
+  href: string;
+  points: number;
+}) {
+  return (
+    <li className="flex items-center gap-2">
+      {done ? (
+        <svg
+          className="w-4 h-4 text-go flex-shrink-0"
+          fill="currentColor"
+          viewBox="0 0 20 20"
+          aria-hidden="true"
+        >
+          <path
+            fillRule="evenodd"
+            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+            clipRule="evenodd"
+          />
+        </svg>
+      ) : (
+        <svg
+          className="w-4 h-4 text-pebble flex-shrink-0"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 20 20"
+          aria-hidden="true"
+        >
+          <circle cx="10" cy="10" r="7" strokeWidth={2} />
+        </svg>
+      )}
+      {done ? (
+        <span className="text-stone line-through">{label}</span>
+      ) : (
+        <Link href={href} className="text-current hover:underline">
+          {label}
+        </Link>
+      )}
+      <span className="text-stone text-xs ml-auto">+{points}%</span>
+    </li>
   );
 }

@@ -1,4 +1,86 @@
+import logging
+
 from celery import shared_task
+from django.conf import settings
+
+logger = logging.getLogger(__name__)
+
+
+@shared_task(name="matching.send_feedback_prompt")
+def send_feedback_prompt(connection_id: str):
+    """Triggered 7 days after first message — prompt both parties for feedback."""
+    from apps.matching.models import Connection, MatchFeedback
+    from apps.messaging.models import Notification
+    from apps.users.models import User
+
+    try:
+        connection = Connection.objects.get(id=connection_id)
+    except Connection.DoesNotExist:
+        return
+
+    # Only prompt for accepted connections
+    if connection.status != Connection.ACCEPTED:
+        return
+
+    # Skip if feedback already submitted
+    if MatchFeedback.objects.filter(connection=connection).exists():
+        return
+
+    # Create FEEDBACK_PROMPT notifications for both parties
+    for user_id in [connection.requester_id, connection.recipient_id]:
+        Notification.objects.create(
+            user_id=user_id,
+            notification_type=Notification.FEEDBACK_PROMPT,
+            reference_id=connection.id,
+            reference_type="Connection",
+        )
+
+    # Send email if preference != OFF
+    for user_id in [connection.requester_id, connection.recipient_id]:
+        try:
+            user = User.objects.get(id=user_id, is_active=True)
+        except User.DoesNotExist:
+            continue
+        if user.email_preference == "OFF":
+            continue
+        _send_feedback_email(user, connection)
+
+    logger.info("Feedback prompt sent for connection %s", connection_id)
+
+
+def _send_feedback_email(user, connection):
+    """Send feedback prompt email via SendGrid."""
+    from sendgrid import SendGridAPIClient
+    from sendgrid.helpers.mail import Mail
+
+    sg_key = getattr(settings, "SENDGRID_API_KEY", None)
+    if not sg_key:
+        logger.warning("SENDGRID_API_KEY not configured — skipping feedback email.")
+        return
+
+    # Determine the other party's name
+    if user.id == connection.requester_id:
+        other = connection.recipient
+    else:
+        other = connection.requester
+
+    mail = Mail(
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to_emails=user.email,
+        subject="How is your connection going?",
+        html_content=(
+            f"<p>Hi {user.first_name},</p>"
+            f"<p>It's been a week since you connected with "
+            f"<strong>{other.get_full_name()}</strong>. "
+            f"We'd love to hear how it's going!</p>"
+            f'<p><a href="{settings.FRONTEND_URL}/matches">Share Your Feedback</a></p>'
+            f"<p>— The Upstream Literacy Team</p>"
+        ),
+    )
+    try:
+        SendGridAPIClient(sg_key).send(mail)
+    except Exception:
+        logger.exception("Failed to send feedback email to %s", user.email)
 
 
 @shared_task(name="matching.compute_all_match_scores")

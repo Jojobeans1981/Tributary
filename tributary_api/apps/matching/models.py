@@ -1,8 +1,11 @@
 import uuid
+from datetime import date
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
+from django.db.models import Q
 
 
 class ProblemStatement(models.Model):
@@ -123,6 +126,59 @@ class Connection(models.Model):
 
     class Meta:
         unique_together = [("requester", "recipient")]
+        indexes = [
+            models.Index(fields=["requester", "status"]),
+            models.Index(fields=["recipient", "status"]),
+            models.Index(fields=["status", "updated_at"]),
+        ]
 
     def __str__(self):
         return f"{self.requester} → {self.recipient} ({self.status})"
+
+
+class FeaturedMember(models.Model):
+    """Staff-curated featured community member. Max 5 active at a time."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="featured",
+    )
+    featured_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="featured_by_me",
+    )
+    featured_from = models.DateField(auto_now_add=True)
+    featured_until = models.DateField(null=True, blank=True)
+    note = models.TextField(max_length=500, blank=True)
+
+    def clean(self):
+        active = FeaturedMember.objects.filter(
+            Q(featured_until__isnull=True) | Q(featured_until__gte=date.today())
+        ).exclude(pk=self.pk).count()
+        if active >= 5:
+            raise ValidationError("Maximum 5 active featured members allowed.")
+
+    def __str__(self):
+        return f"Featured: {self.user}"
+
+
+class MatchFeedback(models.Model):
+    """Post-connection 1-5 star feedback. One per connection."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    connection = models.OneToOneField(
+        Connection,
+        on_delete=models.CASCADE,
+        related_name="feedback",
+    )
+    rating = models.IntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(5)]
+    )
+    feedback_text = models.TextField(max_length=280, blank=True)
+    submitted_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Feedback for {self.connection_id}: {self.rating}/5"

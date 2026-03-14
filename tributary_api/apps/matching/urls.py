@@ -1,5 +1,12 @@
 from django.urls import path
 
+from apps.matching.community_views import (
+    ChannelListView,
+    ChannelMembersView,
+    CommunityListView,
+    MatchFeedbackCreateView,
+    MatchFeedbackListView,
+)
 from apps.matching.views import (
     ConnectionBlockView,
     ConnectionDetailView,
@@ -31,4 +38,12 @@ urlpatterns = [
         "connections/<uuid:connection_id>/block/",
         ConnectionBlockView.as_view(),
     ),
+    # Community directory
+    path("community/", CommunityListView.as_view()),
+    # Channels
+    path("channels/", ChannelListView.as_view()),
+    path("channels/<int:problem_id>/members/", ChannelMembersView.as_view()),
+    # Match feedback
+    path("feedback/", MatchFeedbackCreateView.as_view()),
+    path("feedback/my/", MatchFeedbackListView.as_view()),
 ]

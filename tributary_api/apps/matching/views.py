@@ -137,20 +137,14 @@ class MatchFeedView(APIView):
         user = request.user
         user_id = str(user.id)
 
-        # Get blocked user IDs in both directions
-        blocked_ids = set(
-            Connection.objects.filter(
-                Q(requester=user, status=Connection.BLOCKED)
-                | Q(recipient=user, status=Connection.BLOCKED)
-            ).values_list("requester_id", "recipient_id")
-            .distinct()
-            .values_list("requester_id", flat=True)
-        ) | set(
-            Connection.objects.filter(
-                Q(requester=user, status=Connection.BLOCKED)
-                | Q(recipient=user, status=Connection.BLOCKED)
-            ).values_list("recipient_id", flat=True)
-        )
+        # Get blocked user IDs in both directions (single query)
+        blocked_ids = set()
+        for req_id, rec_id in Connection.objects.filter(
+            Q(requester=user, status=Connection.BLOCKED)
+            | Q(recipient=user, status=Connection.BLOCKED)
+        ).values_list("requester_id", "recipient_id"):
+            blocked_ids.add(req_id)
+            blocked_ids.add(rec_id)
         blocked_ids.discard(user.id)
 
         # Base queryset: scores involving this user, >= min_score
@@ -208,6 +202,25 @@ class MatchFeedView(APIView):
             )
         )
 
+        # Batch-prefetch problem selections for all matched users (avoid N+1)
+        all_selections = UserProblemSelection.objects.filter(
+            user_id__in=matched_user_ids
+        ).values_list("user_id", "problem_statement_id")
+        selections_by_user = {}
+        for uid, pid in all_selections:
+            selections_by_user.setdefault(uid, set()).add(pid)
+
+        # Prefetch all problem statements we might need for shared_problems
+        all_candidate_pids = set()
+        for uid, pids in selections_by_user.items():
+            all_candidate_pids.update(pids & user_pids)
+        problems_by_id = {
+            p["id"]: p
+            for p in ProblemStatement.objects.filter(
+                id__in=all_candidate_pids
+            ).values("id", "title", "category")
+        }
+
         # Build response
         results = []
         for s in scores:
@@ -223,16 +236,10 @@ class MatchFeedView(APIView):
                 if state and other.district.state != state:
                     continue
 
-            # Get shared problems
-            other_pids = set(
-                other.problem_selections.values_list(
-                    "problem_statement_id", flat=True
-                )
-            )
-            shared_ids = list(user_pids & other_pids)
-            shared_problems = ProblemStatement.objects.filter(
-                id__in=shared_ids
-            ).values("id", "title", "category")
+            # Get shared problems from prefetched data
+            other_pids = selections_by_user.get(other.id, set())
+            shared_ids = user_pids & other_pids
+            shared_problems = [problems_by_id[pid] for pid in shared_ids if pid in problems_by_id]
 
             # Connection status
             conn = connections.get(other.id)
@@ -270,7 +277,7 @@ class MatchFeedView(APIView):
                     "bio": other.bio,
                 },
                 "district": district_data,
-                "shared_problems": list(shared_problems),
+                "shared_problems": shared_problems,
                 "demographic_score": s.demographic_score,
                 "problem_score": s.problem_score,
                 "total_score": s.total_score,
@@ -343,7 +350,7 @@ class ConnectionListCreateView(APIView):
         status_filter = request.query_params.get("status")
         qs = Connection.objects.filter(
             Q(requester=request.user) | Q(recipient=request.user)
-        )
+        ).select_related("requester", "recipient")
         if status_filter:
             qs = qs.filter(status=status_filter.upper())
         return ok(ConnectionSerializer(qs, many=True).data)

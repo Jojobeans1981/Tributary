@@ -7,6 +7,8 @@ urlpatterns = [
     path("api/", include("apps.districts.urls")),
     path("api/", include("apps.users.api_urls")),
     path("api/", include("apps.matching.urls")),
+    path("api/", include("apps.messaging.urls")),
+    path("api/staff/", include("apps.staff.urls")),
     # allauth URLs needed so send_confirmation can reverse account_confirm_email
     path("accounts/", include("allauth.urls")),
 ]

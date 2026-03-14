@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { clearTokens } from "@/lib/auth";
@@ -16,6 +16,7 @@ export default function NavHeader({ user }: { user: User | null }) {
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   if (!user) return null;
 
@@ -34,57 +35,105 @@ export default function NavHeader({ user }: { user: User | null }) {
     router.push("/login");
   };
 
+  /* Close dropdown on Escape */
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Escape") {
+      setMenuOpen(false);
+      setMobileOpen(false);
+    }
+  };
+
   return (
-    <header className="bg-abyss h-16 sticky top-0 z-50 flex items-center justify-between px-6">
+    <header
+      className="bg-abyss h-16 sticky top-0 z-50 flex items-center justify-between px-6"
+      role="banner"
+      onKeyDown={handleKeyDown}
+    >
       <Link
         href="/dashboard"
         className="font-display text-current text-xl font-bold"
+        aria-label="Tributary home"
       >
         TRIBUTARY
       </Link>
 
       {/* Desktop nav */}
-      <div className="hidden md:flex items-center gap-4">
-        <Link href="/matches" className="text-foam text-sm hover:text-white transition-colors">
+      <nav
+        className="hidden md:flex items-center gap-4"
+        aria-label="Main navigation"
+      >
+        <Link
+          href="/community"
+          className="text-foam text-sm hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-foam focus:ring-offset-2 focus:ring-offset-abyss rounded px-1"
+        >
+          Community
+        </Link>
+        <Link
+          href="/channels"
+          className="text-foam text-sm hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-foam focus:ring-offset-2 focus:ring-offset-abyss rounded px-1"
+        >
+          Channels
+        </Link>
+        <Link
+          href="/matches"
+          className="text-foam text-sm hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-foam focus:ring-offset-2 focus:ring-offset-abyss rounded px-1"
+        >
           Matches
         </Link>
-        <div className="relative">
+        <Link
+          href="/inbox"
+          className="text-foam text-sm hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-foam focus:ring-offset-2 focus:ring-offset-abyss rounded px-1"
+        >
+          Inbox
+        </Link>
+        <div className="relative" ref={menuRef}>
           <button
             onClick={() => setMenuOpen(!menuOpen)}
-            className="w-9 h-9 rounded-full bg-foam text-abyss font-display font-bold text-sm flex items-center justify-center"
+            aria-expanded={menuOpen}
+            aria-haspopup="true"
+            aria-label="User menu"
+            className="w-9 h-9 rounded-full bg-foam text-abyss font-display font-bold text-sm flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-foam focus:ring-offset-2 focus:ring-offset-abyss"
           >
             {initials}
           </button>
           {menuOpen && (
-            <div className="absolute right-0 mt-2 w-40 bg-chalk rounded-card shadow-card border border-pebble py-1 z-50">
+            <div
+              className="absolute right-0 mt-2 w-40 bg-chalk rounded-card shadow-card border border-pebble py-1 z-50"
+              role="menu"
+            >
               <Link
                 href={`/profile/${user.id}`}
-                className="block px-4 py-2 text-sm text-obsidian hover:bg-sand"
+                className="block px-4 py-2 text-sm text-obsidian hover:bg-sand focus:bg-sand focus:outline-none"
                 onClick={() => setMenuOpen(false)}
+                role="menuitem"
               >
                 Profile
               </Link>
               <button
                 onClick={handleSignOut}
-                className="block w-full text-left px-4 py-2 text-sm text-obsidian hover:bg-sand"
+                className="block w-full text-left px-4 py-2 text-sm text-obsidian hover:bg-sand focus:bg-sand focus:outline-none"
+                role="menuitem"
               >
                 Sign out
               </button>
             </div>
           )}
         </div>
-      </div>
+      </nav>
 
       {/* Mobile hamburger */}
       <button
-        className="md:hidden text-white"
+        className="md:hidden text-white focus:outline-none focus:ring-2 focus:ring-foam rounded"
         onClick={() => setMobileOpen(!mobileOpen)}
+        aria-expanded={mobileOpen}
+        aria-label="Open navigation menu"
       >
         <svg
           className="w-6 h-6"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
+          aria-hidden="true"
         >
           <path
             strokeLinecap="round"
@@ -97,21 +146,29 @@ export default function NavHeader({ user }: { user: User | null }) {
 
       {/* Mobile drawer */}
       {mobileOpen && (
-        <div className="fixed inset-0 z-50 md:hidden">
+        <div
+          className="fixed inset-0 z-50 md:hidden"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Navigation menu"
+        >
           <div
             className="absolute inset-0 bg-black/50"
             onClick={() => setMobileOpen(false)}
+            aria-hidden="true"
           />
           <div className="absolute right-0 top-0 h-full w-64 bg-abyss p-6">
             <button
-              className="text-white mb-8"
+              className="text-white mb-8 focus:outline-none focus:ring-2 focus:ring-foam rounded"
               onClick={() => setMobileOpen(false)}
+              aria-label="Close navigation menu"
             >
               <svg
                 className="w-6 h-6"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
+                aria-hidden="true"
               >
                 <path
                   strokeLinecap="round"
@@ -121,24 +178,45 @@ export default function NavHeader({ user }: { user: User | null }) {
                 />
               </svg>
             </button>
-            <nav className="flex flex-col gap-4">
+            <nav className="flex flex-col gap-4" aria-label="Mobile navigation">
+              <Link
+                href="/community"
+                className="text-foam text-lg focus:outline-none focus:ring-2 focus:ring-foam rounded px-1"
+                onClick={() => setMobileOpen(false)}
+              >
+                Community
+              </Link>
+              <Link
+                href="/channels"
+                className="text-foam text-lg focus:outline-none focus:ring-2 focus:ring-foam rounded px-1"
+                onClick={() => setMobileOpen(false)}
+              >
+                Channels
+              </Link>
               <Link
                 href="/matches"
-                className="text-foam text-lg"
+                className="text-foam text-lg focus:outline-none focus:ring-2 focus:ring-foam rounded px-1"
                 onClick={() => setMobileOpen(false)}
               >
                 Matches
               </Link>
               <Link
+                href="/inbox"
+                className="text-foam text-lg focus:outline-none focus:ring-2 focus:ring-foam rounded px-1"
+                onClick={() => setMobileOpen(false)}
+              >
+                Inbox
+              </Link>
+              <Link
                 href={`/profile/${user.id}`}
-                className="text-foam text-lg"
+                className="text-foam text-lg focus:outline-none focus:ring-2 focus:ring-foam rounded px-1"
                 onClick={() => setMobileOpen(false)}
               >
                 Profile
               </Link>
               <button
                 onClick={handleSignOut}
-                className="text-foam text-lg text-left"
+                className="text-foam text-lg text-left focus:outline-none focus:ring-2 focus:ring-foam rounded px-1"
               >
                 Sign out
               </button>

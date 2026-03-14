@@ -72,6 +72,12 @@ class User(AbstractBaseUser, PermissionsMixin):
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []
 
+    class Meta:
+        indexes = [
+            models.Index(fields=["is_active", "role"]),
+            models.Index(fields=["is_active", "date_joined"]),
+        ]
+
     def __str__(self):
         return self.email
 

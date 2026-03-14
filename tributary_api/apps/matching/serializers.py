@@ -51,12 +51,17 @@ class UpdateSelectionSerializer(serializers.Serializer):
 
 
 class ConnectionSerializer(serializers.ModelSerializer):
+    requester_name = serializers.SerializerMethodField()
+    recipient_name = serializers.SerializerMethodField()
+
     class Meta:
         model = Connection
         fields = [
             "id",
             "requester",
             "recipient",
+            "requester_name",
+            "recipient_name",
             "status",
             "intro_message",
             "created_at",
@@ -69,6 +74,12 @@ class ConnectionSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
+
+    def get_requester_name(self, obj):
+        return obj.requester.get_full_name() if obj.requester else ""
+
+    def get_recipient_name(self, obj):
+        return obj.recipient.get_full_name() if obj.recipient else ""
 
 
 class CreateConnectionSerializer(serializers.Serializer):

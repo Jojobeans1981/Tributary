@@ -6,6 +6,7 @@ import os
 from datetime import timedelta
 from pathlib import Path
 
+from celery.schedules import crontab
 from decouple import config, Csv
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -40,6 +41,8 @@ INSTALLED_APPS = [
     "apps.users",
     "apps.districts",
     "apps.matching",
+    "apps.messaging",
+    "apps.staff",
 ]
 
 MIDDLEWARE = [
@@ -115,7 +118,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # Django REST Framework
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "apps.messaging.authentication.TrackingJWTAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
@@ -166,6 +169,33 @@ CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = "UTC"
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
+CELERY_BEAT_SCHEDULE = {
+    "nightly-match-scores": {
+        "task": "matching.compute_all_match_scores",
+        "schedule": crontab(hour=2, minute=0),
+    },
+    "daily-digest-emails": {
+        "task": "messaging.send_daily_digest_emails",
+        "schedule": crontab(hour=7, minute=0),
+    },
+    "daily-profile-nudge": {
+        "task": "users.send_incomplete_profile_nudge",
+        "schedule": crontab(hour=10, minute=0),
+    },
+    "daily-analytics-cache": {
+        "task": "staff.refresh_analytics_cache",
+        "schedule": crontab(hour=1, minute=0),
+    },
+}
+
+# AWS S3
+AWS_ACCESS_KEY_ID = config("AWS_ACCESS_KEY_ID", default="")
+AWS_SECRET_ACCESS_KEY = config("AWS_SECRET_ACCESS_KEY", default="")
+AWS_STORAGE_BUCKET_NAME = config("AWS_STORAGE_BUCKET_NAME", default="tributary-uploads")
+AWS_S3_REGION_NAME = config("AWS_S3_REGION_NAME", default="us-east-1")
+
+# SendGrid
+SENDGRID_API_KEY = config("SENDGRID_API_KEY", default="")
 
 # Channels
 CHANNEL_LAYERS = {

@@ -4,6 +4,20 @@ from apps.districts.serializers import DistrictSerializer
 from apps.users.models import FerpaConsent, User
 
 
+def _profile_completion_pct(user) -> int:
+    score = 0
+    if user.bio and user.bio.strip():
+        score += 40
+    if user.district_id:
+        score += 30
+    selections = user.problem_selections.count()
+    if selections >= 1:
+        score += 20
+    if selections >= 2:
+        score += 10
+    return min(score, 100)
+
+
 class RegisterSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True, min_length=8)
@@ -39,6 +53,7 @@ class UserSerializer(serializers.ModelSerializer):
     has_ferpa_consent = serializers.SerializerMethodField()
     has_district = serializers.SerializerMethodField()
     profile_completion_pct = serializers.SerializerMethodField()
+    problem_selection_count = serializers.SerializerMethodField()
     district = DistrictSerializer(read_only=True)
 
     class Meta:
@@ -52,6 +67,7 @@ class UserSerializer(serializers.ModelSerializer):
             "bio",
             "district",
             "profile_completion_pct",
+            "problem_selection_count",
             "has_ferpa_consent",
             "has_district",
             "email_preference",
@@ -65,7 +81,10 @@ class UserSerializer(serializers.ModelSerializer):
         return obj.district_id is not None
 
     def get_profile_completion_pct(self, obj):
-        return 40 if obj.bio else 0
+        return _profile_completion_pct(obj)
+
+    def get_problem_selection_count(self, obj):
+        return obj.problem_selections.count()
 
 
 class PublicUserSerializer(serializers.ModelSerializer):
@@ -116,4 +135,4 @@ class LoginResponseUserSerializer(serializers.ModelSerializer):
         return obj.problem_selections.exists()
 
     def get_profile_completion_pct(self, obj):
-        return 40 if obj.bio else 0
+        return _profile_completion_pct(obj)
