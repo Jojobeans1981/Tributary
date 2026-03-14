@@ -14,6 +14,12 @@ class Command(BaseCommand):
             help="Path to a local CSV file. If omitted, downloads from NCES.",
         )
         parser.add_argument(
+            "--url",
+            type=str,
+            default=None,
+            help="URL to download a CSV file from (e.g. a GitHub raw link).",
+        )
+        parser.add_argument(
             "--dry-run",
             action="store_true",
             default=False,
@@ -28,9 +34,27 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         self.stdout.write("Starting NCES CCD ETL...")
+
+        # If --url is provided, download to a temp file first
+        local_file = options["file"]
+        if options["url"]:
+            import tempfile
+            import urllib.request
+            self.stdout.write(f"Downloading from {options['url']}...")
+            tmp = tempfile.NamedTemporaryFile(
+                suffix=".csv", delete=False, mode="wb"
+            )
+            try:
+                urllib.request.urlretrieve(options["url"], tmp.name)
+                local_file = tmp.name
+                self.stdout.write(f"Downloaded to {tmp.name}")
+            except Exception as e:
+                self.stderr.write(self.style.ERROR(f"Download failed: {e}"))
+                return
+
         try:
             result = run_ingestion(
-                local_file=options["file"],
+                local_file=local_file,
                 dry_run=options["dry_run"],
                 data_vintage=options["vintage"],
             )
