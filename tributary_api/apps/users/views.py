@@ -23,6 +23,7 @@ from apps.users.utils import err, ok
 
 
 class RegisterView(APIView):
+    authentication_classes = []
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -76,6 +77,7 @@ class VerifyEmailView(APIView):
 
 
 class LoginView(APIView):
+    authentication_classes = []
     permission_classes = [AllowAny]
 
     def post(self, request):
