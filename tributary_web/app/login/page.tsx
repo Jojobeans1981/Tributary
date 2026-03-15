@@ -93,7 +93,7 @@ export default function LoginPage() {
           </Link>
           {" | "}
           <Link
-            href="/api/auth/password/reset"
+            href="/forgot-password"
             className="text-current hover:underline"
           >
             Forgot password?
