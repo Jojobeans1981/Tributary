@@ -313,9 +313,9 @@ export default function InboxPage() {
                             : "bg-chalk border border-pebble text-obsidian"
                         }`}
                       >
-                        {!isMe && !msg.system_message && (
-                          <p className="text-xs font-bold text-deep mb-1">
-                            {msg.sender_name}
+                        {!msg.system_message && (
+                          <p className={`text-xs font-bold mb-1 ${isMe ? "text-foam/80" : "text-deep"}`}>
+                            {isMe ? "You" : msg.sender_name}
                           </p>
                         )}
                         <p className="text-sm whitespace-pre-wrap">{msg.body}</p>
