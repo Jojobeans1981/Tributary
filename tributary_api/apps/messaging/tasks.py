@@ -7,7 +7,13 @@ from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
-_redis = redis.Redis.from_url(settings.CELERY_BROKER_URL, decode_responses=True)
+def _get_redis():
+    try:
+        r = redis.Redis.from_url(settings.CELERY_BROKER_URL, decode_responses=True)
+        r.ping()
+        return r
+    except Exception:
+        return None
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)
@@ -31,19 +37,23 @@ def check_and_send_message_email(self, user_id: str, message_id: str):
 
     if pref == "IMMEDIATE":
         # Skip if user was active in the last 5 minutes
-        last_seen_key = f"last_seen:{user_id}"
-        if _redis.exists(last_seen_key):
-            return
+        r = _get_redis()
+        if r:
+            last_seen_key = f"last_seen:{user_id}"
+            if r.exists(last_seen_key):
+                return
 
         _send_message_email(user, message)
 
     elif pref == "DAILY_DIGEST":
         # Push to Redis list for daily batch processing
-        digest_key = f"digest:{user_id}"
-        _redis.rpush(
-            digest_key,
-            f"{message.sender.get_full_name()}: {message.body[:100]}",
-        )
+        r = _get_redis()
+        if r:
+            digest_key = f"digest:{user_id}"
+            r.rpush(
+                digest_key,
+                f"{message.sender.get_full_name()}: {message.body[:100]}",
+            )
 
 
 @shared_task
@@ -54,12 +64,17 @@ def send_daily_digest_emails():
     users = User.objects.filter(
         email_preference="DAILY_DIGEST", is_active=True
     )
+    r = _get_redis()
+    if not r:
+        logger.warning("Redis unavailable — skipping daily digest.")
+        return
+
     for user in users:
         digest_key = f"digest:{user.id}"
-        items = _redis.lrange(digest_key, 0, -1)
+        items = r.lrange(digest_key, 0, -1)
         if not items:
             continue
-        _redis.delete(digest_key)
+        r.delete(digest_key)
         _send_digest_email(user, items)
 
 

@@ -143,45 +143,51 @@ class ConversationMessagesView(APIView):
         ]
         Notification.objects.bulk_create(notifications)
 
-        # Trigger email notification task
-        from apps.messaging.tasks import check_and_send_message_email
+        # Trigger email notification task (skip if Celery/Redis unavailable)
+        try:
+            from apps.messaging.tasks import check_and_send_message_email
 
-        for p in participants:
-            check_and_send_message_email.delay(
-                str(p.user_id),
-                str(msg.id),
-            )
+            for p in participants:
+                check_and_send_message_email.delay(
+                    str(p.user_id),
+                    str(msg.id),
+                )
+        except Exception:
+            pass
 
         # Schedule feedback prompt 7 days after the first message in a conversation
         msg_count = Message.objects.filter(conversation_id=conversation_id).count()
         if msg_count == 1:
-            from django.db.models import Q
+            try:
+                from django.db.models import Q
 
-            from apps.matching.models import Connection
-            from apps.matching.tasks import send_feedback_prompt
+                from apps.matching.models import Connection
+                from apps.matching.tasks import send_feedback_prompt
 
-            participant_ids = list(
-                ConversationParticipant.objects.filter(
-                    conversation_id=conversation_id
-                ).values_list("user_id", flat=True)
-            )
-            if len(participant_ids) == 2:
-                connection = Connection.objects.filter(
-                    Q(
-                        requester_id=participant_ids[0],
-                        recipient_id=participant_ids[1],
-                    )
-                    | Q(
-                        requester_id=participant_ids[1],
-                        recipient_id=participant_ids[0],
-                    ),
-                    status=Connection.ACCEPTED,
-                ).first()
-                if connection:
-                    send_feedback_prompt.apply_async(
-                        args=[str(connection.id)],
-                        countdown=604800,  # 7 days
-                    )
+                participant_ids = list(
+                    ConversationParticipant.objects.filter(
+                        conversation_id=conversation_id
+                    ).values_list("user_id", flat=True)
+                )
+                if len(participant_ids) == 2:
+                    connection = Connection.objects.filter(
+                        Q(
+                            requester_id=participant_ids[0],
+                            recipient_id=participant_ids[1],
+                        )
+                        | Q(
+                            requester_id=participant_ids[1],
+                            recipient_id=participant_ids[0],
+                        ),
+                        status=Connection.ACCEPTED,
+                    ).first()
+                    if connection:
+                        send_feedback_prompt.apply_async(
+                            args=[str(connection.id)],
+                            countdown=604800,  # 7 days
+                        )
+            except Exception:
+                pass
 
         data = MessageSerializer(msg).data
         return ok(data)
