@@ -144,20 +144,25 @@ export default function InboxPage() {
     if (!activeId || !body.trim()) return;
     setSending(true);
 
-    // Send via REST (WebSocket will echo it back)
-    await apiFetch(`/api/conversations/${activeId}/messages/`, {
+    const trimmed = body.trim();
+    const res = await apiFetch<MessageItem>(`/api/conversations/${activeId}/messages/`, {
       method: "POST",
-      body: JSON.stringify({ body: body.trim() }),
+      body: JSON.stringify({ body: trimmed }),
     });
 
     setBody("");
     setSending(false);
 
+    // Add sent message to the thread immediately
+    if (res.success && res.data) {
+      setMessages((prev) => [...prev, res.data!]);
+    }
+
     // update sidebar preview
     setConvos((prev) =>
       prev.map((c) =>
         c.id === activeId
-          ? { ...c, last_message_preview: body.trim().slice(0, 60) }
+          ? { ...c, last_message_preview: trimmed.slice(0, 60) }
           : c
       )
     );
