@@ -89,10 +89,6 @@ export default function AnalyticsPage() {
     }
     apiFetch<MeData>("/api/users/me/").then((res) => {
       if (res.success && res.data) {
-        if (!["UPSTREAM_STAFF", "PLATFORM_ADMIN"].includes(res.data.role)) {
-          router.replace("/dashboard");
-          return;
-        }
         setMe(res.data);
       }
     });
