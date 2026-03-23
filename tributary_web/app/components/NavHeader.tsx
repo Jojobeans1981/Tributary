@@ -111,6 +111,63 @@ export default function NavHeader({ user }: { user: User | null }) {
           />
         </svg>
         TRIBUTARY
+        {/* Mirrored logo — horizontally flipped */}
+        <svg
+          width="32"
+          height="32"
+          viewBox="0 0 64 64"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          aria-hidden="true"
+          className="shrink-0"
+          style={{ transform: "scaleX(-1)" }}
+        >
+          {/* Left tributary stream */}
+          <path
+            d="M10 8C14 20 18 28 32 40C32 40 32 48 32 58"
+            stroke="#0E7C8B"
+            strokeWidth="3.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          {/* Right tributary stream */}
+          <path
+            d="M54 8C50 20 46 28 32 40"
+            stroke="#0E7C8B"
+            strokeWidth="3.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          {/* Small left branch */}
+          <path
+            d="M4 22C12 26 20 32 28 36"
+            stroke="#12A8BC"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+          />
+          {/* Small right branch */}
+          <path
+            d="M60 22C52 26 44 32 36 36"
+            stroke="#12A8BC"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+          />
+          {/* Water drop at confluence */}
+          <circle cx="32" cy="42" r="3.5" fill="#C8EEF2" />
+          {/* Flow lines below confluence */}
+          <path
+            d="M30 50C30 52 31 55 32 58"
+            stroke="#C8EEF2"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+          />
+          <path
+            d="M34 50C34 52 33 55 32 58"
+            stroke="#C8EEF2"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+          />
+        </svg>
       </Link>
 
       {/* Desktop nav */}

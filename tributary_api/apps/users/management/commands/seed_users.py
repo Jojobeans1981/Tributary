@@ -327,5 +327,11 @@ class Command(BaseCommand):
         self.stdout.write(f"  Domain:   @{domain}")
         self.stdout.write(f"  Password: {password}")
         self.stdout.write(f"  Users:    {count}")
+        self.stdout.write("")
+        self.stdout.write("  LOGINS (email / password):")
+        self.stdout.write("  " + "-" * 46)
+        for u in user_objects:
+            self.stdout.write(f"    {u.email}  /  {password}")
+        self.stdout.write("  " + "-" * 46)
         self.stdout.write(f"  Login as any user at /login")
         self.stdout.write("=" * 50)
