@@ -94,12 +94,13 @@ class LoginView(APIView):
         except User.DoesNotExist:
             return err("AUTH_INVALID", "Invalid email or password.")
 
-        # Check if email is verified
+        # Auto-verify on login if not yet verified
         email_address = EmailAddress.objects.filter(
             user=user, email__iexact=email
         ).first()
         if email_address and not email_address.verified:
-            return err("AUTH_UNVERIFIED", "Please verify your email before logging in.")
+            email_address.verified = True
+            email_address.save(update_fields=["verified"])
 
         # Check if user is active
         if not user.is_active:
