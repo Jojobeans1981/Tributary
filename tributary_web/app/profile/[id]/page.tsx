@@ -69,6 +69,14 @@ export default function ProfilePage() {
 
   const isOwnProfile = me?.id === id;
 
+  const handleMessage = async () => {
+    await apiFetch<{ id: string }>("/api/conversations/", {
+      method: "POST",
+      body: JSON.stringify({ participant_id: id }),
+    });
+    router.push("/inbox");
+  };
+
   const handleSaveBio = async () => {
     setBioError("");
     const res = await apiFetch<unknown>("/api/users/me/", {
@@ -113,7 +121,7 @@ export default function ProfilePage() {
             <div className="w-12 h-12 rounded-full bg-foam text-current font-display font-bold text-lg flex items-center justify-center">
               {initials}
             </div>
-            <div>
+            <div className="flex-1">
               <h1 className="font-display text-abyss text-xl font-bold">
                 {profile.first_name} {profile.last_name}
               </h1>
@@ -121,6 +129,14 @@ export default function ProfilePage() {
                 {profile.role}
               </span>
             </div>
+            {!isOwnProfile && (
+              <button
+                onClick={handleMessage}
+                className="bg-abyss text-white text-sm font-bold px-4 py-2 rounded-input hover:opacity-90 transition-colors"
+              >
+                Message
+              </button>
+            )}
           </div>
 
           {/* Bio */}

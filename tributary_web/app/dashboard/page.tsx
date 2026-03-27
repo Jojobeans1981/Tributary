@@ -40,6 +40,7 @@ export default function DashboardPage() {
   const [user, setUser] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
   const [pendingConnections, setPendingConnections] = useState<ConnectionItem[]>([]);
+  const [justAccepted, setJustAccepted] = useState<ConnectionItem[]>([]);
 
   useEffect(() => {
     const token = localStorage.getItem("access_token");
@@ -80,10 +81,22 @@ export default function DashboardPage() {
       body: JSON.stringify({ status: "ACCEPTED" }),
     });
     if (res.success) {
+      const accepted = pendingConnections.find((c) => c.id === connectionId);
       setPendingConnections((prev) =>
         prev.filter((c) => c.id !== connectionId)
       );
+      if (accepted) {
+        setJustAccepted((prev) => [...prev, accepted]);
+      }
     }
+  };
+
+  const handleMessage = async (userId: string) => {
+    await apiFetch<{ id: string }>("/api/conversations/", {
+      method: "POST",
+      body: JSON.stringify({ participant_id: userId }),
+    });
+    router.push("/inbox");
   };
 
   const handleDecline = async (connectionId: string) => {
@@ -162,6 +175,43 @@ export default function DashboardPage() {
                       Decline
                     </button>
                   </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Just accepted connections */}
+        {justAccepted.length > 0 && (
+          <div
+            className="bg-chalk rounded-card shadow-card p-4 border border-go mb-6"
+            role="region"
+            aria-label="Accepted connections"
+          >
+            <h2 className="font-display text-abyss font-bold mb-3">
+              New Connections
+            </h2>
+            <div className="space-y-3">
+              {justAccepted.map((conn) => (
+                <div
+                  key={conn.id}
+                  className="flex items-center justify-between gap-3 bg-mist rounded-input p-3"
+                >
+                  <div className="min-w-0">
+                    <Link
+                      href={`/profile/${conn.requester}`}
+                      className="font-display text-abyss font-bold text-sm hover:underline"
+                    >
+                      {conn.requester_name}
+                    </Link>
+                    <p className="text-go text-xs mt-0.5">Connected</p>
+                  </div>
+                  <button
+                    onClick={() => handleMessage(conn.requester)}
+                    className="bg-abyss text-white text-xs font-bold px-3 py-1.5 rounded-input hover:opacity-90 transition-colors"
+                  >
+                    Message
+                  </button>
                 </div>
               ))}
             </div>
