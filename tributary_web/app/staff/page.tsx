@@ -62,13 +62,17 @@ export default function StaffDashboardPage() {
   const [feedback, setFeedback] = useState("");
   const [staffFilter, setStaffFilter] = useState(false);
 
-  /* auth check — allow any logged-in user to view staff dashboard */
+  /* auth check — restrict to staff roles */
   useEffect(() => {
     const token = localStorage.getItem("access_token");
     if (!token) { router.replace("/login"); return; }
 
     apiFetch<MeData>("/api/users/me/").then((res) => {
       if (res.success && res.data) {
+        if (res.data.role !== "UPSTREAM_STAFF" && res.data.role !== "PLATFORM_ADMIN") {
+          router.replace("/dashboard");
+          return;
+        }
         setMe(res.data);
       }
     });

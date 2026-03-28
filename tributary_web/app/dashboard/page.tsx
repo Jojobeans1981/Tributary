@@ -262,13 +262,13 @@ export default function DashboardPage() {
               <CompletionItem
                 done={user.problem_selection_count >= 1}
                 label="Choose a problem statement"
-                href="/onboarding/problems"
+                href={user.problem_selection_count >= 1 ? "/settings" : "/onboarding/problems"}
                 points={20}
               />
               <CompletionItem
                 done={user.problem_selection_count >= 2}
                 label="Choose a second problem statement"
-                href="/onboarding/problems"
+                href={user.problem_selection_count >= 1 ? "/settings" : "/onboarding/problems"}
                 points={10}
               />
             </ul>

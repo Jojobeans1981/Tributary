@@ -222,6 +222,14 @@ export default function NavHeader({ user }: { user: User | null }) {
               >
                 Profile
               </Link>
+              <Link
+                href="/settings"
+                className="block px-4 py-2 text-sm text-obsidian hover:bg-sand focus:bg-sand focus:outline-none"
+                onClick={() => setMenuOpen(false)}
+                role="menuitem"
+              >
+                Settings
+              </Link>
               <button
                 onClick={handleSignOut}
                 className="block w-full text-left px-4 py-2 text-sm text-obsidian hover:bg-sand focus:bg-sand focus:outline-none"
@@ -326,6 +334,13 @@ export default function NavHeader({ user }: { user: User | null }) {
                 onClick={() => setMobileOpen(false)}
               >
                 Profile
+              </Link>
+              <Link
+                href="/settings"
+                className="text-foam text-lg focus:outline-none focus:ring-2 focus:ring-foam rounded px-1"
+                onClick={() => setMobileOpen(false)}
+              >
+                Settings
               </Link>
               <button
                 onClick={handleSignOut}
