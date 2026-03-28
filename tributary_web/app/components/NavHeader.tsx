@@ -10,6 +10,7 @@ interface User {
   id: string;
   first_name: string;
   last_name: string;
+  role?: string;
 }
 
 export default function NavHeader({ user }: { user: User | null }) {
@@ -199,6 +200,14 @@ export default function NavHeader({ user }: { user: User | null }) {
         >
           Inbox
         </Link>
+        {(user.role === "UPSTREAM_STAFF" || user.role === "PLATFORM_ADMIN") && (
+          <Link
+            href="/staff"
+            className="text-amber text-sm font-bold hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-foam focus:ring-offset-2 focus:ring-offset-abyss rounded px-1"
+          >
+            Admin
+          </Link>
+        )}
         <div className="relative" ref={menuRef}>
           <button
             onClick={() => setMenuOpen(!menuOpen)}
@@ -328,6 +337,15 @@ export default function NavHeader({ user }: { user: User | null }) {
               >
                 Inbox
               </Link>
+              {(user.role === "UPSTREAM_STAFF" || user.role === "PLATFORM_ADMIN") && (
+                <Link
+                  href="/staff"
+                  className="text-amber text-lg font-bold focus:outline-none focus:ring-2 focus:ring-foam rounded px-1"
+                  onClick={() => setMobileOpen(false)}
+                >
+                  Admin
+                </Link>
+              )}
               <Link
                 href={`/profile/${user.id}`}
                 className="text-foam text-lg focus:outline-none focus:ring-2 focus:ring-foam rounded px-1"

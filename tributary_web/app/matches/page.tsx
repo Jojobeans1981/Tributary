@@ -43,6 +43,7 @@ interface MeData {
   id: string;
   first_name: string;
   last_name: string;
+  role: string;
 }
 
 function ScoreBadge({ score }: { score: number }) {
